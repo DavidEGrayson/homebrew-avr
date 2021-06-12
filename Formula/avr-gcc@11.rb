@@ -10,6 +10,14 @@ class AvrGccAT11 < Formula
 
   head "https://gcc.gnu.org/git/gcc.git"
 
+  # This patch fixes a GCC compilation error on Apple ARM systems by adding
+  # a defintion for host_hooks.  Patch comes from
+  # https://github.com/riscv/riscv-gnu-toolchain/issues/800#issuecomment-808722775
+  patch do
+    url "https://gist.githubusercontent.com/DavidEGrayson/88bceb3f4e62f45725ecbb9248366300/raw/c1f515475aff1e1e3985569d9b715edb0f317648/gcc-11-arm-darwin.patch"
+    sha256 "c4e9df9802772ddecb71aa675bb9403ad34c085d1359cb0e45b308ab6db551c6"
+  end
+
   bottle do
     root_url "https://github.com/osx-cross/homebrew-avr/releases/download/avr-gcc@11-11.1.0_1"
     sha256 big_sur:  "464e8ec8913654d85c7da6d7bfb17ff7b358f37c8b6a10395c48d571c2540213"
@@ -33,8 +41,6 @@ class AvrGccAT11 < Formula
   # with the ATMega168pbSupport option.
   depends_on "autoconf" => :build
   depends_on "automake" => :build
-
-  depends_on arch: :x86_64
 
   depends_on "avr-binutils"
 
@@ -132,20 +138,18 @@ class AvrGccAT11 < Formula
       ENV.delete "CC"
       ENV.delete "CXX"
 
+      # avr-libc ships with outdated config.guess and config.sub scripts that
+      # do not support Apple ARM systems, causing the configure script to fail.
       build_config = `./config.guess`.chomp
+      if build_config.start_with?('-')
+        ENV['ac_cv_build'] = 'unknown-apple-darwin'
+        puts "Forcing build system to unknown-apple-darwin."
+      end
 
       system "./bootstrap" if current_build.with? "ATMega168pbSupport"
-      system "./configure", "--build=#{build_config}", "--prefix=#{prefix}", "--host=avr"
+      system "./configure", "--prefix=#{prefix}", "--host=avr"
       system "make", "install"
     end
-  end
-
-  def caveats
-    <<~EOS
-      For Mac computers with Apple silicon, avr-gcc might need Rosetta 2 to work properly.
-      You can learn more about Rosetta 2 here:
-          > https://support.apple.com/en-us/HT211861
-    EOS
   end
 
   test do
